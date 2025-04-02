@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hi There!</title>
+    <link rel="icon" href="images/chatbubble.png" type="image/png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playwrite+US+Trad:wght@100..400&display=swap" rel="stylesheet">
+    <style>
+        body {
+            background-color: #bacfde;
+        }
+
+        h1 {
+            display: inline-block;
+            padding-left: 10px;
+            padding-right: 10px;
+            font-family: "Playwrite US Trad", cursive;
+            font-size: 4em;
+            color: whitesmoke;
+        }
+        
+        .container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            padding: 0;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .playwrite-us-trad {
+            font-family: "Playwrite US Trad", cursive;
+            font-optical-sizing: auto;
+            font-weight: 400;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="hidden">Welcome!</h1>
+    </div>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+    <script>
+        $(document).ready( () => {
+            $("h1").fadeIn(1800);
+        })
+    </script>
+</body>
+</html>
