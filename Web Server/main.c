@@ -14,6 +14,9 @@
 #define MAX_METHOD_LEN 10
 #define MAX_PATH_LEN 100
 
+int visitor_count = 0;
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+
 char *url_decode(const char *encoded)
 {
     size_t encoded_len = strlen(encoded);
@@ -112,7 +115,7 @@ int check_file(const char *file_path)
     
     if(fp == NULL)
     {
-        perror("File not found");
+        perror("\nFile not found");
         fclose(fp);
         return -1;
     }
@@ -128,7 +131,7 @@ void send_file(int client_fd, const char *file_path)
     
     if(fp == NULL)
     {
-        perror("File not found.\n");
+        perror("\nFile not found");
         return;
     }
     
@@ -141,7 +144,7 @@ void send_file(int client_fd, const char *file_path)
 }
 
 void print_header(const char *label, char *header) {
-    if (header) 
+    if(header) 
     {
         char value[256];  
 
@@ -155,6 +158,8 @@ void *handle_client(void *arg)
 {
     int client_fd = *((int *)arg);
     char *buffer = (char *)malloc(BUFFER_SIZE * sizeof(char));
+
+    printf("\nRequest is being handled by thread [%lu].\n", pthread_self());
     
     // * Receive request data from client and store into buffer
     ssize_t bytes_received = recv(client_fd, buffer, BUFFER_SIZE, 0);
@@ -241,6 +246,14 @@ void *handle_client(void *arg)
             printf("\n\n------ SERVER RESPONSE ------\n%s\n", response);
             dprintf(client_fd, "%s", response);
             send_file(client_fd, file_path);
+
+            // * Increment visitor count
+            if(strcmp(path, "/index.html") == 0)
+            {
+                pthread_mutex_lock(&mutex);
+                printf("\nVisitor count: %d\n", ++visitor_count);
+                pthread_mutex_unlock(&mutex);
+            }
         }
         else
         {
@@ -324,9 +337,9 @@ int main(int argc, char const* argv[])
         }
 
         // * Create a new thread to handle client request
-        printf("\nRequest accepted.\n");
         pthread_t thread_id;
         pthread_create(&thread_id, NULL, handle_client, (void *)client_fd);
+        printf("\nRequest accepted.\n");
         pthread_detach(thread_id);
     }
 
@@ -338,7 +351,5 @@ int main(int argc, char const* argv[])
 
 /* // TODO 
     - Add debugging logs (the commented out dprintf, HTTP only accepts certain format so logs can't be sent via dprintf)?
-    - Client program?
-    - Dynamic visitor count
     - POST?
 */
