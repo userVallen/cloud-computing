@@ -1,0 +1,58 @@
+body {
+    background-color: #bacfde;
+    font-family: "Playwrite US Trad", cursive;
+    color: whitesmoke;
+}
+
+h1 {
+    display: inline-block;
+    padding-left: 10px;
+    padding-right: 10px;
+    font-size: 4em;
+    text-align: center;
+}
+
+p {
+    font-size: 1.75em;
+    text-align: center;
+}
+
+form {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+input {
+    border: none;
+    border-bottom: 2px solid whitesmoke;
+    background-color: inherit;
+    font-family: "Playwrite US Trad", cursive;
+    font-size: 1.25em;
+    color: whitesmoke;
+    text-align: center;
+}
+
+input:focus {
+    outline: none;
+}
+
+.container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    margin: 0;
+    padding: 0;
+}
+
+.hidden {
+    display: none;
+}
+
+.playwrite-us-trad {
+    font-family: "Playwrite US Trad", cursive;
+    font-optical-sizing: auto;
+    font-weight: 400;
+    font-style: italic;
+}

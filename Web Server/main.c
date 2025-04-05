@@ -159,38 +159,75 @@ void *handle_client(void *arg)
     int client_fd = *((int *)arg);
     char *buffer = (char *)malloc(BUFFER_SIZE * sizeof(char));
 
-    printf("\nRequest is being handled by thread [%lu].\n", pthread_self());
+    printf("\nRequest is being handled by thread [%lu].\n", (long)pthread_self());
     
     // * Receive request data from client and store into buffer
     ssize_t bytes_received = recv(client_fd, buffer, BUFFER_SIZE, 0);
 
     if(bytes_received > 0)
     {
-        // * Print the request (take only the first line + the necessary details)
+        // * Null terminate the request
         buffer[bytes_received] = '\0';
 
+        // * Extract important information from the request header
         char *user_agent = strstr(buffer, "User-Agent:");
         char *host = strstr(buffer, "Host:");
-        char *accept_lang = strstr(buffer, "Accept-Language:");
-        char *accept_enc = strstr(buffer, "Accept-Encoding:");
+        char *accept_language = strstr(buffer, "Accept-Language:");
+        char *accept_encoding = strstr(buffer, "Accept-Encoding:");
         char *connection = strstr(buffer, "Connection:");
+
+        // * Extract the content length of the body
+        int body_length = 0;
+        char *length_ptr = strstr(buffer, "Content-Length: ");
+        if (length_ptr) sscanf(length_ptr, "Content-Length: %d", &body_length);
+
+        // * Find the start of the body
+        char *body_start = strstr(buffer, "\r\n\r\n");
+
+        // * Skip \r\n\r\n
+        if (body_start) body_start += 4;
+        else body_start = buffer + strlen(buffer);
 
         char *end_of_first_line = strchr(buffer, '\n');  
         if (end_of_first_line) *end_of_first_line = '\0';
-
-        printf("\n\n------ CLIENT REQUEST ------\n%s\n", buffer);
+        
+        // * Print the (selected contents of the) request header
+        printf("\n\n------ CLIENT REQUEST HEADER ------\n%s\n", buffer);
         print_header("User-Agent", user_agent);
         print_header("Host", host);
-        print_header("Accept-Language", accept_lang);
-        print_header("Accept-Encoding", accept_enc);
+        print_header("Accept-Language", accept_language);
+        print_header("Accept-Encoding", accept_encoding);
         print_header("Connection", connection);
-
+        
         // * Parse the request line
         char method[MAX_METHOD_LEN], path[MAX_PATH_LEN], http_version[20];
         sscanf(buffer, "%s %s %s", method, path, http_version);
+        
+        // * Identify the request method
+        char username[100] = "";
+        if(strcmp(method, "POST") == 0)
+        {
+            strcpy(path, "/greetings");
+    
+            // * Read the request body
+            int body_received = strlen(body_start);
+            if (body_received < body_length)
+            {
+                read(client_fd, body_start + body_received, body_length - body_received);
+                body_start[body_length] = '\0';
+            }
 
-        // * Redirect the homepage
-        if(strcmp(path, "/") == 0 || strcmp(path, "/home") == 0) strcpy(path, "/index.html");
+            // * Extract the username and store it
+            sscanf(body_start, "username=%99s", username);
+            
+            // * Print the body
+            printf("\n\n------ CLIENT REQUEST BODY ------\n%s\n", body_start);
+        }
+        else if(strcmp(method, "GET") == 0)
+        {   
+            // * Redirect the homepage
+            if(strcmp(path, "/") == 0 || strcmp(path, "/home") == 0) strcpy(path, "/index.html");
+        }
         
         // * Decode the URL
         char *decoded_url = url_decode(path);
@@ -208,7 +245,7 @@ void *handle_client(void *arg)
             strcpy(file_path, "public/notfound.html");
             file_exists = 0;
         }
-        
+
         // * Get the current date and time
         char date_and_time[50];
         get_date_and_time(date_and_time, sizeof(date_and_time));
@@ -231,10 +268,79 @@ void *handle_client(void *arg)
         // * Construct the response
         printf("\n\nConstructing response...\n");
         char response[1000];
+        char response_body[1000];
 
-        if(file_exists)
+        if(file_exists || !strcmp(method, "POST"))
         {
-            snprintf(response, sizeof(response), "HTTP/1.1 200 OK\r\n"
+            if(strcmp(path, "/greetings") == 0)
+            {        
+                int body_length = snprintf(response_body, sizeof(response_body), "<!DOCTYPE html>"
+                                                                                 "<html lang='en'>"
+                                                                                 "<head>"
+                                                                                 "<meta charset='UTF-8'>"
+                                                                                 "<meta name='viewport' content='width=device-width, initial-scale=1.0'>"
+                                                                                 "<title>Hi There!</title>"
+                                                                                 "<link rel='icon' href='images/chatbubble.png' type='image/png'>"
+                                                                                 "<link rel='preconnect' href='https://fonts.googleapis.com'>"
+                                                                                 "<link rel='preconnect' href='https://fonts.gstatic.com' crossorigin>"
+                                                                                 "<link href='https://fonts.googleapis.com/css2?family=Playwrite+US+Trad:wght@100..400&display=swap' rel='stylesheet'>"
+                                                                                 "<link rel='stylesheet' href='styles.css'>"
+                                                                                 "</head>"
+                                                                                 "<body>"
+                                                                                 "<div class='container'>"
+                                                                                 "<h1 class='hidden'>Nice to meet you, %s!</h1>"
+                                                                                 "</div>"
+                                                                                 "<script src='https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js'></script>"
+                                                                                 "<script>$('h1').fadeIn(1800);</script>"
+                                                                                 "</body>"
+                                                                                 "</html>", 
+                username);
+
+                char response[9000];
+                int response_len = snprintf(response, sizeof(response), "HTTP/1.1 200 OK\r\n"
+                                                                        "Content-Type: %s\r\n"
+                                                                        "Content-Length: %d\r\n"
+                                                                        "Connection: %s\r\n"
+                                                                        "\r\n"
+                                                                        "%s",
+                content_type, body_length, connection_type, response_body);
+                
+                // * Send the response
+                printf("\n\n------ SERVER RESPONSE ------\n%s\n", response);
+                dprintf(client_fd, "%s", response);
+                send(client_fd, response, body_length, 0);
+            }
+            else
+            {
+                snprintf(response, sizeof(response), "HTTP/1.1 200 OK\r\n"
+                                                     "Date: %s\r\n"
+                                                     "Server: My Server\r\n"
+                                                     "Last-Modified: %s\r\n"
+                                                     "Content-Length: %ld\r\n"
+                                                     "Content-Type: %s\r\n"
+                                                     "Connection: %s\r\n"
+                                                     "\r\n", 
+                date_and_time, last_modified, content_length, content_type, connection_type);
+    
+                // * Send the response header
+                printf("\n\n------ SERVER RESPONSE ------\n%s\n", response);
+                dprintf(client_fd, "%s", response);
+
+                // * Send the response body
+                send_file(client_fd, file_path);
+    
+                // * Increment visitor count
+                if(strcmp(method, "GET") == 0 && strcmp(path, "/index.html") == 0)
+                {
+                    pthread_mutex_lock(&mutex);
+                    printf("\nVisitor count: %d\n", ++visitor_count);
+                    pthread_mutex_unlock(&mutex);
+                }
+            }
+        }
+        else
+        {
+            snprintf(response, sizeof(response), "HTTP/1.1 404 Not Found\r\n"
                                                  "Date: %s\r\n"
                                                  "Server: My Server\r\n"
                                                  "Last-Modified: %s\r\n"
@@ -243,29 +349,8 @@ void *handle_client(void *arg)
                                                  "Connection: %s\r\n"
                                                  "\r\n", 
             date_and_time, last_modified, content_length, content_type, connection_type);
-            printf("\n\n------ SERVER RESPONSE ------\n%s\n", response);
-            dprintf(client_fd, "%s", response);
-            send_file(client_fd, file_path);
 
-            // * Increment visitor count
-            if(strcmp(path, "/index.html") == 0)
-            {
-                pthread_mutex_lock(&mutex);
-                printf("\nVisitor count: %d\n", ++visitor_count);
-                pthread_mutex_unlock(&mutex);
-            }
-        }
-        else
-        {
-            snprintf(response, sizeof(response), "HTTP/1.1 404 Not Found\r\n"
-                                                    "Date: %s\r\n"
-                                                    "Server: My Server\r\n"
-                                                    "Last-Modified: %s\r\n"
-                                                    "Content-Length: %ld\r\n"
-                                                    "Content-Type: %s\r\n"
-                                                    "Connection: %s\r\n"
-                                                    "\r\n", 
-            date_and_time, last_modified, content_length, content_type, connection_type);
+            // * Send the response
             printf("\n\n------SERVER RESPONSE------\n%s\n", response);
             dprintf(client_fd, "%s", response);
             send_file(client_fd, file_path);
@@ -347,9 +432,3 @@ int main(int argc, char const* argv[])
     close(server_fd);
     return 0;
 }
-
-
-/* // TODO 
-    - Add debugging logs (the commented out dprintf, HTTP only accepts certain format so logs can't be sent via dprintf)?
-    - POST?
-*/
